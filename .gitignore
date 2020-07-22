@@ -1,0 +1,8 @@
+/proguard
+*.zip
+*.txt*
+*.jar
+
+# class*
+# config*
+# proguard_*
