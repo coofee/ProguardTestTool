@@ -1,0 +1,51 @@
+import java.nio.file.Files
+import java.nio.file.Paths
+import java.nio.file.StandardCopyOption
+
+afterEvaluate {
+    // All proguard tasks shall depend on our filter task
+    def proguardTasks = tasks.findAll { task ->
+        task.name.startsWith('transformClassesAndResourcesWithProguardFor')
+    }
+
+    File proguardConfigDir = new File(projectDir, "proguard_config_dir")
+    if (!proguardConfigDir.exists()) {
+        proguardConfigDir.mkdirs()
+    }
+    
+    println("[PROGUARD] proguardTasks=$proguardTasks")
+    proguardTasks.each { task ->
+//        println("proguard task.properties=${task.properties}")
+        task.doLast {
+//            println("proguard task.properties=${task.properties}")
+            println("[PROGUARD] secondaryFileInputs=${task.secondaryFileInputs}")
+            task.secondaryFileInputs.each { fileCollection ->
+                println("[PROGUARD] secondaryFileInputs.fileCollection=$fileCollection")
+
+                fileCollection.each { File file ->
+                    if (!file.exists() || !file.isFile()) {
+                        return
+                    }
+                    println("[PROGUARD] secondaryFileInputs.fileCollection.file=$file")
+    
+                    String myProguardFileName = file.name
+                    File androidManifestFile = new File(file.parentFile, "AndroidManifest.xml")
+                    if (androidManifestFile.exists()) {
+                        groovy.util.Node rootNode = new groovy.util.XmlParser().parse(androidManifestFile)
+                        String packageName = rootNode.attribute("package")
+                        def namespace = new groovy.xml.Namespace("http://schemas.android.com/apk/res/android", 'android')
+                        String versionName = rootNode.attributes()[namespace.versionName]
+                        String versionCode = rootNode.attributes()[namespace.versionCode]
+                        println("[PROGUARD] packageName=$packageName, versionName=$versionName, versionCode=$versionCode")
+                        myProguardFileName += " ${packageName}_${versionName}_${versionCode}.pro"
+                    }
+    
+                    File proguardConfigFile = new File(proguardConfigDir, myProguardFileName)
+                    println("[PROGUARD] try copy file=$file to $proguardConfigFile ...")
+                    Files.copy(Paths.get(file.absolutePath), Paths.get(proguardConfigFile.absolutePath), StandardCopyOption.REPLACE_EXISTING)
+                    println("[PROGUARD] done copy file=$file to $proguardConfigFile .")
+                }
+            }
+        }
+    }
+}
